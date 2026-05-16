@@ -171,3 +171,637 @@ function runStatTests() {
 
   console.log("All stat engine tests passed ✓");
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   STATE MANAGEMENT
+   ═══════════════════════════════════════════════════════════════ */
+
+var gameState = {
+  phase: "start",
+  eventIndex: 0,
+  stats: { pressure: 0, suspicion: 0, fame: 100, credibility: 100 },
+  lastDeltas: {},
+  breakdown: {},
+  passiveSuspicion: 0,
+  chosenAction: null,
+  history: []
+};
+
+var STORAGE_KEY = "vr-samizdat-state";
+
+function saveState() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(gameState));
+  } catch (e) {}
+}
+
+function loadState() {
+  try {
+    var saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      var s = JSON.parse(saved);
+      if (s && s.phase) {
+        gameState = s;
+        return true;
+      }
+    }
+  } catch (e) {}
+  return false;
+}
+
+function resetState() {
+  gameState = {
+    phase: "start",
+    eventIndex: 0,
+    stats: { pressure: 0, suspicion: 0, fame: 100, credibility: 100 },
+    lastDeltas: {},
+    breakdown: {},
+    passiveSuspicion: 0,
+    chosenAction: null,
+    history: []
+  };
+  localStorage.removeItem(STORAGE_KEY);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   DOM HELPERS
+   ═══════════════════════════════════════════════════════════════ */
+
+function el(tag, className, children) {
+  var element = document.createElement(tag);
+  if (className) element.className = className;
+  if (typeof children === "string") {
+    element.textContent = children;
+  } else if (Array.isArray(children)) {
+    for (var i = 0; i < children.length; i++) {
+      if (children[i]) element.appendChild(children[i]);
+    }
+  } else if (children instanceof HTMLElement) {
+    element.appendChild(children);
+  }
+  return element;
+}
+
+function elHTML(tag, className, html) {
+  var element = document.createElement(tag);
+  if (className) element.className = className;
+  element.innerHTML = html;
+  return element;
+}
+
+function statSign(v) {
+  return v === 0 ? "0" : (v > 0 ? "+" + v : "" + v);
+}
+
+function statSignClass(key, v) {
+  if (key === "suspicion") return v > 0 ? "neg" : v < 0 ? "pos" : "";
+  return v > 0 ? "pos" : v < 0 ? "neg" : "";
+}
+
+function redactText(text, density) {
+  return text.split(" ").map(function(w) {
+    if (Math.random() < density && w.length > 3) {
+      return '<span class="redact">' + "█".repeat(Math.min(w.length, 8)) + '</span>';
+    }
+    return w;
+  }).join(" ");
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   MASTHEAD
+   ═══════════════════════════════════════════════════════════════ */
+
+var MONTHS = ["JANUARY","FEBRUARY","MARCH","APRIL","MAY","JUNE","JULY",
+              "AUGUST","SEPTEMBER","OCTOBER","NOVEMBER","DECEMBER"];
+var WEEKDAYS = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+
+function shortIssueDate(dateline) {
+  var m = dateline.match(/([A-Z]+)\s+(\d{1,2}),?\s*(\d{4})/);
+  if (!m) return dateline;
+  var monthIdx = MONTHS.indexOf(m[1]);
+  var day = parseInt(m[2], 10);
+  var year = parseInt(m[3], 10);
+  if (monthIdx < 0) return dateline;
+  var wd = WEEKDAYS[new Date(year, monthIdx, day).getDay()];
+  var mn = m[1].charAt(0) + m[1].slice(1).toLowerCase();
+  return wd + ", " + day + " " + mn + " " + year;
+}
+
+function renderMasthead(container, issueNumber, dateline) {
+  var susp = gameState.stats.suspicion;
+  var motto = susp >= 600
+    ? "▌▌▌ TRUTH UNDER ▌▌▌▌▌▌▌▌"
+    : "TRUTH WHERE THE STATE PERMITS NONE";
+
+  var header = el("header", "masthead", [
+    el("div", "masthead-top", [
+      el("span", null, "Vol. I · No. " + String(issueNumber).padStart(3, "0")),
+      el("span", null, "Cena Kčs 1,— · Sdělovací prostředek samizdat"),
+      el("span", null, "For Free Circulation Only")
+    ]),
+    el("h1", "masthead-title", "Svobodný Tisk"),
+    el("div", "masthead-subtitle", "The Free Press · Edited & Printed Underground · Praha"),
+    el("div", "masthead-bottom", [
+      el("span", "masthead-issue", shortIssueDate(dateline)),
+      el("span", null, motto),
+      el("span", null, "Pass on to one trusted reader · Do not post publicly")
+    ])
+  ]);
+  container.appendChild(header);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   STAT TICKER
+   ═══════════════════════════════════════════════════════════════ */
+
+function renderStatTicker(container) {
+  var ticker = el("div", "stat-ticker");
+  var keys = ["pressure", "suspicion", "fame", "credibility"];
+
+  for (var i = 0; i < keys.length; i++) {
+    var k = keys[i];
+    var meta = STAT_META[k];
+    var v = gameState.stats[k];
+    var delta = gameState.lastDeltas[k] || 0;
+    var isWarn = k === "suspicion" && v >= 600;
+    var isPos = k === "credibility" && v >= 150;
+
+    var statDiv = el("div", "stat" + (isWarn ? " high-suspicion" : "") + (isPos ? " positive" : ""));
+
+    statDiv.appendChild(el("div", "stat-label", meta.label));
+    statDiv.appendChild(el("div", "stat-sub", meta.sub));
+
+    var maxVal = (k === "pressure" || k === "suspicion") ? 1000 : 1000;
+    var pct = Math.min(100, (v / maxVal) * 100);
+
+    var valueRow = el("div", "stat-value-row", [
+      el("div", "stat-value", String(Math.round(v))),
+      el("div", "stat-multiplier", "[ " + getMultiplierDisplay(k, v) + " ]")
+    ]);
+    statDiv.appendChild(valueRow);
+
+    var bar = el("div", "stat-bar");
+    var fill = el("div", "stat-bar-fill");
+    fill.style.width = pct + "%";
+    bar.appendChild(fill);
+    statDiv.appendChild(bar);
+
+    if (delta !== 0) {
+      var anno = el("div", "stat-anno show" + (delta < 0 ? " neg" : ""),
+                    (delta > 0 ? "+" : "") + delta);
+      statDiv.appendChild(anno);
+    }
+
+    ticker.appendChild(statDiv);
+  }
+
+  container.appendChild(ticker);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   CALENDAR STRIP
+   ═══════════════════════════════════════════════════════════════ */
+
+function renderCalendarStrip(container) {
+  var events = window.VR_EVENTS;
+  var strip = el("div", "calendar-strip");
+
+  for (var i = 0; i < events.length; i++) {
+    var shortLabel = extractShortDate(events[i].date);
+    var cls = "cal-tick";
+    if (i < gameState.eventIndex) cls += " past";
+    if (i === gameState.eventIndex) cls += " current";
+
+    var tick = el("div", cls, shortLabel);
+    tick.title = events[i].date;
+    strip.appendChild(tick);
+  }
+
+  container.appendChild(strip);
+}
+
+function extractShortDate(dateline) {
+  var m = dateline.match(/([A-Z]+)\s+(\d{1,2})/);
+  if (!m) return "";
+  var month = m[1];
+  var day = m[2];
+  if (month === "NOVEMBER") return "Nov " + day;
+  if (month === "DECEMBER") return "Dec " + day;
+  return month.substring(0, 3) + " " + day;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   START SCREEN
+   ═══════════════════════════════════════════════════════════════ */
+
+function renderStart(container) {
+  var card = el("div", "start-card", [
+    el("div", "dateline", "Praha · Editors' meeting · 17 November 1989 · 06:00"),
+    el("h2", "start-title", "You edit a paper that does not legally exist."),
+    el("p", "start-subtitle", "Six contributors. One mimeograph. Forty-two days of history about to break open."),
+    elHTML("p", "start-body",
+      'Tonight a student march sets off from Albertov. The next six weeks will end the regime — ' +
+      'or will not, depending in part on what gets printed and what does not. ' +
+      '<strong>Each dispatch that reaches your desk demands a decision.</strong> ' +
+      'Each decision shapes what your readers believe, and what they do next.'
+    ),
+    elHTML("p", "start-body",
+      'Four standings are tracked along your masthead — ' +
+      '<strong>Pressure</strong> (revolutionary momentum), ' +
+      '<strong>Suspicion</strong> (state security attention), ' +
+      '<strong>Fame</strong> (readers reached), and ' +
+      '<strong>Credibility</strong> (public trust). ' +
+      'Push too hard and the StB reads you before your readers do. ' +
+      'Stay too quiet and the streets march without you.'
+    ),
+    elHTML("p", "start-body",
+      'Reach <strong>1000 Pressure</strong> by December 29 and your paper ' +
+      'becomes part of history. Let <strong>Suspicion</strong> reach 1000 ' +
+      'and the secret police shut you down.'
+    )
+  ]);
+
+  var btn = el("button", "btn-begin", "Open the first dispatch");
+  btn.addEventListener("click", function() {
+    gameState.phase = "event";
+    gameState.lastDeltas = {};
+    render();
+  });
+  card.appendChild(btn);
+
+  container.appendChild(card);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   EVENT + CHOICES SCREEN
+   ═══════════════════════════════════════════════════════════════ */
+
+function renderEvent(container) {
+  var events = window.VR_EVENTS;
+  var event = events[gameState.eventIndex];
+  var suspHigh = gameState.stats.suspicion >= 600;
+  var suspCritical = gameState.stats.suspicion >= 800;
+
+  var grid = el("div", "dispatch-grid");
+
+  // Left column: event card
+  var card = el("article", "event-card fade-up");
+
+  if (suspHigh) {
+    card.appendChild(el("div", "censor-banner",
+      "StB watching · re-write for safety · cite no names this issue"));
+  }
+
+  card.appendChild(el("div", "dateline", event.date));
+  card.appendChild(el("h2", "headline", event.headline));
+  card.appendChild(el("p", "kicker", event.kicker));
+
+  var bodyText = event.body;
+  if (suspCritical) {
+    bodyText = redactText(bodyText, 0.07);
+  }
+  card.appendChild(elHTML("div", "body-text ruled dropcap", bodyText));
+
+  if (event.attendance) {
+    card.appendChild(el("div", "attendance-badge",
+      "▸ " + event.attendance.toLocaleString() + " people"));
+  }
+
+  grid.appendChild(card);
+
+  // Right column: choices
+  var choicesCol = el("section", "choices-column");
+  choicesCol.appendChild(el("h3", "choices-header",
+    "— On the editor's desk — Choose which to set in type —"));
+
+  for (var i = 0; i < event.choices.length; i++) {
+    (function(choice, idx) {
+      var btn = el("button", "choice fade-up");
+      btn.style.animationDelay = (idx * 80) + "ms";
+
+      btn.appendChild(el("span", "choice-mark",
+        "Draft № " + String(idx + 1).padStart(2, "0") + " · for press tonight"));
+      btn.appendChild(el("span", "choice-label", choice.label));
+      btn.appendChild(el("span", "choice-draft", choice.draft));
+
+      // Impact pills
+      var impact = el("span", "choice-impact");
+      var keys = ["pressure", "suspicion", "fame", "credibility"];
+      for (var j = 0; j < keys.length; j++) {
+        var k = keys[j];
+        var v = choice.deltas[k];
+        if (v === undefined || v === 0) continue;
+        var cls = "impact-pill " + statSignClass(k, v);
+        impact.appendChild(elHTML("span", cls,
+          STAT_META[k].label + ' <span class="delta">' + statSign(v) + '</span>'));
+      }
+      btn.appendChild(impact);
+
+      btn.addEventListener("click", function() { pickChoice(choice); });
+      choicesCol.appendChild(btn);
+    })(event.choices[i], i);
+  }
+
+  grid.appendChild(choicesCol);
+  container.appendChild(grid);
+}
+
+function pickChoice(choice) {
+  var event = window.VR_EVENTS[gameState.eventIndex];
+  var result = applyDeltas(gameState.stats, choice.deltas);
+
+  gameState.stats = result.stats;
+  gameState.lastDeltas = result.deltas;
+  gameState.breakdown = result.breakdown;
+  gameState.passiveSuspicion = result.passiveSuspicion;
+  gameState.chosenAction = choice;
+  gameState.history.push({ eventId: event.id, choiceId: choice.id });
+
+  // Check for shutdown (S >= 1000)
+  if (gameState.stats.suspicion >= 1000) {
+    gameState.phase = "shutdown";
+  } else {
+    gameState.phase = "outcome";
+  }
+
+  render();
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   OUTCOME SCREEN
+   ═══════════════════════════════════════════════════════════════ */
+
+function renderOutcome(container) {
+  var events = window.VR_EVENTS;
+  var event = events[gameState.eventIndex];
+  var choice = gameState.chosenAction;
+  var deltas = gameState.lastDeltas;
+  var breakdown = gameState.breakdown;
+  var isLast = gameState.eventIndex + 1 >= events.length;
+
+  var grid = el("div", "dispatch-grid");
+
+  // Left: event card (recap)
+  var card = el("article", "event-card");
+  card.appendChild(el("div", "dateline", event.date));
+  card.appendChild(el("h2", "headline", event.headline));
+  card.appendChild(el("p", "kicker", event.kicker));
+  grid.appendChild(card);
+
+  // Right: outcome
+  var rightCol = el("div", null);
+  rightCol.appendChild(el("h3", "choices-header", "— Set in type —"));
+
+  var outcomeCard = el("div", "outcome-card fade-up");
+
+  // Stamp
+  var stampGood = (deltas.credibility || 0) >= 15 || (deltas.fame || 0) >= 20;
+  var stamp = el("div", "outcome-stamp stamp-in" + (stampGood ? " stamp-go" : ""),
+                 stampGood ? "Published" : "In Press");
+  outcomeCard.appendChild(stamp);
+
+  outcomeCard.appendChild(el("div", "outcome-eyebrow", "— Editor's note · after the run —"));
+  outcomeCard.appendChild(el("h3", "outcome-title", '"' + choice.label + '"'));
+  outcomeCard.appendChild(el("p", "outcome-body", choice.outcome));
+
+  // Stat deltas with calculation transparency
+  var deltasDiv = el("div", "outcome-deltas");
+  var keys = ["pressure", "suspicion", "fame", "credibility"];
+  for (var i = 0; i < keys.length; i++) {
+    var k = keys[i];
+    var v = deltas[k];
+    if (!v || v === 0) continue;
+    var cls = "outcome-delta " + statSignClass(k, v);
+    deltasDiv.appendChild(el("span", cls, STAT_META[k].label + " " + statSign(v)));
+  }
+  outcomeCard.appendChild(deltasDiv);
+
+  // Calculation breakdown
+  if (breakdown.pressure) {
+    var bp = breakdown.pressure;
+    outcomeCard.appendChild(el("div", "calc-breakdown",
+      "P: " + statSign(bp.base) + " × " + bp.fameMult.toFixed(2) + " Fame × " +
+      bp.credMult.toFixed(2) + " Cred = " + statSign(bp.final)));
+  }
+  if (breakdown.suspicion) {
+    var bs = breakdown.suspicion;
+    outcomeCard.appendChild(el("div", "calc-breakdown",
+      "S: " + statSign(bs.base) + " × " + bs.suspMult.toFixed(2) + " Watch = " + statSign(bs.final)));
+  }
+  if (gameState.passiveSuspicion > 0) {
+    outcomeCard.appendChild(el("div", "passive-susp-note",
+      "+" + gameState.passiveSuspicion + "S passive (your fame draws attention)"));
+  }
+
+  // Next button
+  var nextDiv = el("div", "outcome-next");
+  var nextBtn = el("button", "btn-next", isLast ? "Close the edition" : "To the next dispatch");
+  nextBtn.addEventListener("click", function() { advanceToNext(); });
+  nextDiv.appendChild(nextBtn);
+  outcomeCard.appendChild(nextDiv);
+
+  rightCol.appendChild(outcomeCard);
+  grid.appendChild(rightCol);
+  container.appendChild(grid);
+}
+
+function advanceToNext() {
+  var events = window.VR_EVENTS;
+  if (gameState.eventIndex + 1 >= events.length) {
+    // Final event — check for legacy ending
+    if (gameState.stats.pressure >= 1000) {
+      gameState.phase = "legacy";
+    } else {
+      gameState.phase = "ranked";
+    }
+  } else {
+    gameState.eventIndex++;
+    gameState.chosenAction = null;
+    gameState.lastDeltas = {};
+    gameState.breakdown = {};
+    gameState.passiveSuspicion = 0;
+    gameState.phase = "event";
+  }
+  render();
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   ENDING SCREENS
+   ═══════════════════════════════════════════════════════════════ */
+
+function computeRanking(stats) {
+  if (stats.credibility < 50) {
+    return {
+      title: "Readers Wandered Away.",
+      subtitle: "Your readers drifted to papers that double-checked their typescripts.",
+      body: "Sensation kept you visible at first. Sensation could not keep you trusted. " +
+            "By Christmas you were quoted nowhere but in your own pages. " +
+            "The Velvet Revolution succeeded — but not because of anything you printed."
+    };
+  }
+  if (stats.pressure >= 800) {
+    return {
+      title: "Svobodný Tisk — A Voice In The Chorus.",
+      subtitle: "One of two dozen samizdat papers that came out of the cellars in November. " +
+                "You held your readership through to the inauguration.",
+      body: "Not every dispatch was first. Not every story was yours. But the readers who " +
+            "began with you on November 17 were still with you on December 29. The Velvet " +
+            "Revolution succeeded, and your pages were in the hands of those who marched."
+    };
+  }
+  if (stats.pressure >= 500) {
+    return {
+      title: "Svobodný Tisk — A Footnote In The Annals.",
+      subtitle: "Issues 1 through " + (gameState.eventIndex + 1) + ", preserved in the Charter 77 Archive. " +
+                "Limited circulation. Several typescripts.",
+      body: "You survived the six weeks. You did not bend, but you did not break through either. " +
+            "The Velvet Revolution succeeded around you — the marchers carried other papers, " +
+            "chanted other slogans. There will be other editions, other years."
+    };
+  }
+  return {
+    title: "The Masthead Folds.",
+    subtitle: "Too cautious to matter. The revolution happened, but your pages were not part of it.",
+    body: "History does not record what you chose not to print. The Velvet Revolution succeeded — " +
+          "Havel took the oath, the borders opened, the committees met. Your paper survived, " +
+          "but survival is not the same as contribution."
+  };
+}
+
+function renderLegacy(container) {
+  var card = el("div", "end-card", [
+    el("div", "dateline", "Praha · 30 December 1989 · 06:00"),
+    el("h2", "start-title", "Svobodný Tisk — Paper of Record."),
+    el("p", "start-subtitle",
+      "Held by the National Library. Cited in seven foreign monographs. " +
+      "Bound into the first textbook of the new civic curriculum."),
+    el("p", "start-body",
+      "You ran the speech. You named the deputies. You held the line on what could be proved. " +
+      "The Velvet Revolution succeeded — and your pages were part of why. " +
+      "On December 29th your single-word headline sold out by nine in the morning.")
+  ]);
+
+  appendFinalStats(card);
+  appendRestartButton(card);
+  container.appendChild(card);
+}
+
+function renderShutdown(container) {
+  var card = el("div", "end-card", [
+    el("div", "dateline", "Praha · StB file closure · " + getCurrentDateText()),
+    el("h2", "start-title", "The paper went silent."),
+    el("p", "start-subtitle",
+      "The StB found the press in a Holešovice cellar. Three editors are in Ruzyně."),
+    el("p", "start-body",
+      "You pushed too far, too publicly. The revolution carried on and succeeded without you — " +
+      "Havel still took the oath on December 29. But your pages were not in the hands that mattered. " +
+      "The amnesty will free the editors. The issues of the final weeks were never set.")
+  ]);
+
+  appendFinalStats(card);
+  appendRestartButton(card);
+  container.appendChild(card);
+}
+
+function renderRanked(container) {
+  var ranking = computeRanking(gameState.stats);
+  var card = el("div", "end-card", [
+    el("div", "dateline", "Praha · 30 December 1989 · 06:00"),
+    el("h2", "start-title", ranking.title),
+    el("p", "start-subtitle", ranking.subtitle),
+    el("p", "start-body", ranking.body)
+  ]);
+
+  appendFinalStats(card);
+  appendRestartButton(card);
+  container.appendChild(card);
+}
+
+function appendFinalStats(card) {
+  var statsDiv = el("div", "outcome-deltas");
+  statsDiv.style.borderTop = "none";
+  statsDiv.style.paddingTop = "0";
+  var keys = ["pressure", "suspicion", "fame", "credibility"];
+  for (var i = 0; i < keys.length; i++) {
+    var k = keys[i];
+    statsDiv.appendChild(el("span", "outcome-delta",
+      STAT_META[k].label + " · " + Math.round(gameState.stats[k])));
+  }
+  card.appendChild(statsDiv);
+}
+
+function appendRestartButton(card) {
+  var btnDiv = el("div", null);
+  btnDiv.style.marginTop = "24px";
+  var btn = el("button", "btn-begin", "Set the type again");
+  btn.addEventListener("click", function() {
+    resetState();
+    render();
+  });
+  btnDiv.appendChild(btn);
+  card.appendChild(btnDiv);
+}
+
+function getCurrentDateText() {
+  var events = window.VR_EVENTS;
+  var event = events[gameState.eventIndex];
+  if (!event) return "December 1989";
+  var m = event.date.match(/([A-Z]+)\s+(\d{1,2})/);
+  if (!m) return "December 1989";
+  return m[1].charAt(0) + m[1].slice(1).toLowerCase() + " " + m[2] + ", 1989";
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   RENDER DISPATCHER
+   ═══════════════════════════════════════════════════════════════ */
+
+function render() {
+  var paper = document.getElementById("paper");
+  paper.innerHTML = "";
+  paper.className = "paper" + (gameState.stats.suspicion >= 900 ? " danger" : "");
+
+  var events = window.VR_EVENTS;
+  var event = events[gameState.eventIndex];
+  var dateline = event ? event.date : "PRAGUE — DECEMBER 29, 1989";
+  var issueNumber = gameState.eventIndex + 1;
+
+  renderMasthead(paper, issueNumber, dateline);
+  renderStatTicker(paper);
+
+  if (gameState.phase !== "start" && gameState.phase !== "legacy" &&
+      gameState.phase !== "shutdown" && gameState.phase !== "ranked") {
+    renderCalendarStrip(paper);
+  }
+
+  switch (gameState.phase) {
+    case "start":    renderStart(paper); break;
+    case "event":    renderEvent(paper); break;
+    case "outcome":  renderOutcome(paper); break;
+    case "legacy":   renderLegacy(paper); break;
+    case "shutdown": renderShutdown(paper); break;
+    case "ranked":   renderRanked(paper); break;
+  }
+
+  renderFooter(paper);
+  saveState();
+}
+
+function renderFooter(container) {
+  var deck = elHTML("footer", "deck",
+    '<div class="deck-item"><div class="deck-label">Editor in Chief</div>J. Procházková</div>' +
+    '<div class="deck-item"><div class="deck-label">Printer of record</div>mimeograph № 4 · Žižkov</div>' +
+    '<div class="deck-item"><div class="deck-label">Issued under</div>no permit · no imprint · no quarter</div>'
+  );
+  container.appendChild(deck);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   INIT
+   ═══════════════════════════════════════════════════════════════ */
+
+function init() {
+  loadState();
+  render();
+}
+
+window.addEventListener("DOMContentLoaded", init);
