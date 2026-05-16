@@ -57,9 +57,11 @@ Persisted to `localStorage` on every state change. Restored on page load if pres
 
 ### Win / Loss Conditions
 
-- **Victory:** P >= 1000 by Dec 29
-- **Instant loss:** S >= 1000 at any point (StB shuts you down)
-- **Soft loss:** Reach Dec 29 with P < 1000 (revolution fizzles — ranked ending based on how close)
+- **Victory:** P >= 1000 at end of Dec 29 (checked only after the final event)
+- **Instant loss:** S >= 1000 at any point (StB shuts you down — only mid-game loss condition)
+- **Soft loss:** Reach Dec 29 with P < 1000 (your paper failed to meaningfully contribute — ranked ending based on final stats)
+
+**Important:** The win check happens ONLY after the final event (Dec 29). The game always plays through all 33 events unless the player is eliminated by suspicion. This preserves the full historical timeline as an educational experience. The Velvet Revolution always succeeds historically — the question is whether YOUR PAPER contributed meaningfully to it.
 
 ### Pressure Formula
 
@@ -206,6 +208,15 @@ A small number of events are "dramatized but plausible" (StB archive-burning pac
 4. Verify that the suspicion multiplier creates meaningful late-game pressure without creating unwinnable death spirals.
 5. Verify passive suspicion doesn't make all strategies eventually lose — it should only punish players who have both high Fame AND high Credibility (i.e., very successful journalists draw more attention).
 
+### Known Balancing Risks
+
+**Pressure snowball:** Because P is multiplied by BOTH Fame and Credibility, the combined multiplier can reach ×1.45 × ×1.60 = ×2.32 at very high F/C values. A +300P event becomes +696P. The balancing pass must verify that this doesn't trivialize the late game. Mitigation options if needed:
+- Cap the combined multiplier at ×2.0
+- Reduce base P on late-game Big Events
+- Ensure F/C growth is slow enough that reaching extreme brackets requires sacrificing other stats
+
+**Suspicion stacking:** High F/C → passive suspicion + suspicion multiplier + aggressive choices can stack into unwinnable positions. The balancing pass must verify that balanced play doesn't death-spiral. Mitigation: ensure at least 3-4 events in the late game offer meaningful suspicion reduction (-20S or more) without catastrophic P loss.
+
 ### Balancing Adjustments Documentation
 
 All changes to the user's original stat values must be documented in a `BALANCE_LOG.md` file with:
@@ -223,7 +234,7 @@ All changes to the user's original stat values must be documented in a `BALANCE_
 2. **Event screen** — Two-column layout:
    - Left: event card with dateline, headline, kicker, body text, attendance badge (Big Events)
    - Right: choices column with 2-3 editorial draft options showing stat impact pills
-3. **Outcome screen** — Shows chosen action's result text, animated stat deltas in handwritten style, "Next dispatch" button. Also check for instant loss (S>=1000) before advancing.
+3. **Outcome screen** — Shows chosen action's result text, animated stat deltas in handwritten style, "Next dispatch" button. Includes calculation transparency: base stat change, multiplier applied, and final value (e.g., "+150P × 1.15 Fame × 1.30 Cred = +224P"). Check for instant loss (S>=1000) before advancing.
 4. **Win screen** — P >= 1000 reached: celebratory ending themed as the paper becoming "Paper of Record"
 5. **Loss screen** — S >= 1000: "The StB found your press" ending
 6. **End screen** — Reached Dec 29 with P < 1000: ranked ending based on final stats (multiple tiers from "Paper of Record" to "A Footnote")
@@ -234,12 +245,17 @@ All changes to the user's original stat values must be documented in a `BALANCE_
 Start → Event → Player picks choice → Apply deltas (with multipliers) → 
   Add passive suspicion → Check S >= 1000 → 
     If yes → Loss screen
-    If no → Outcome screen → Check P >= 1000 →
-      If yes → Win screen
-      If no → Check if last event →
-        If yes → End screen (ranked)
-        If no → Next event
+    If no → Outcome screen → Check if last event →
+      If yes → Check P >= 1000 →
+        If yes → Win screen
+        If no → End screen (ranked)
+      If no → Next event
 ```
+
+The P >= 1000 win check happens ONLY after the final event (Dec 29). This ensures:
+- Players always experience the full historical timeline (unless eliminated by suspicion)
+- The game's educational value is preserved — you see Havel elected regardless
+- Strategic tension is maintained — you don't know if you've "won" until the end
 
 ### Calendar Strip
 
@@ -303,24 +319,24 @@ Ported directly from the prototype's CSS. No redesign needed — the samizdat ae
 
 ## Endings
 
-### Win (P >= 1000)
+### Win (P >= 1000 at Dec 29)
 
 Title: "Svobodný Tisk — Paper of Record"
-The paper is preserved in the National Library. Cited in foreign monographs. You helped shape the revolution.
+The paper is preserved in the National Library. Cited in foreign monographs. Your reporting helped shape the revolution. The Velvet Revolution succeeded — and your pages were part of why.
 
-### Loss (S >= 1000)
+### Loss (S >= 1000 mid-game)
 
 Title: "The paper went silent."
-The StB found your press. Editors arrested. The revolution carried on without you.
+The StB found your press. Editors arrested. The revolution carried on and succeeded without you — Havel still took the oath on December 29. But your pages were not in the hands that mattered.
 
 ### Soft Loss — Ranked Tiers (Dec 29, P < 1000)
 
-Based on final P value and overall stat balance:
+The Velvet Revolution succeeded regardless — the question is whether your paper contributed. All endings acknowledge the historical outcome.
 
-- **P >= 800:** "A Voice in the Chorus" — you contributed meaningfully but weren't decisive
-- **P >= 500:** "A Footnote in the Annals" — limited circulation, you survived but didn't break through
-- **P < 500:** "The Masthead Folds" — too cautious, the revolution happened around you
-- **Credibility < 50 (any P):** "Readers Wandered Away" — lost trust, special ending that overrides the P-based tier above
+- **P >= 800:** "A Voice in the Chorus" — your paper was one of many that helped, but not the one historians cite first. The revolution succeeded; your contribution was real but not decisive.
+- **P >= 500:** "A Footnote in the Annals" — limited circulation, archived in the Charter 77 collection. The revolution succeeded around you.
+- **P < 500:** "The Masthead Folds" — too cautious to matter. The revolution succeeded despite your silence. History does not record what you chose not to print.
+- **Credibility < 50 (any P):** "Readers Wandered Away" — you lost public trust. Even good intentions can't help a paper nobody believes. This overrides the P-based tier above.
 
 ---
 
