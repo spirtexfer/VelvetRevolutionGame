@@ -31,7 +31,7 @@ A single `gameState` object:
 
 ```js
 {
-  phase: "start" | "event" | "outcome" | "win" | "loss" | "end",
+  phase: "start" | "event" | "outcome" | "legacy" | "shutdown" | "ranked",
   eventIndex: 0,
   stats: { pressure: 0, suspicion: 0, fame: 100, credibility: 100 },
   lastDeltas: {},
@@ -57,9 +57,9 @@ Persisted to `localStorage` on every state change. Restored on page load if pres
 
 ### Win / Loss Conditions
 
-- **Victory:** P >= 1000 at end of Dec 29 (checked only after the final event)
-- **Instant loss:** S >= 1000 at any point (StB shuts you down — only mid-game loss condition)
-- **Soft loss:** Reach Dec 29 with P < 1000 (your paper failed to meaningfully contribute — ranked ending based on final stats)
+- **Legacy ending:** P >= 1000 at end of Dec 29 (checked only after the final event) — your paper made a major contribution
+- **Shutdown ending:** S >= 1000 at any point (StB shuts you down — only mid-game loss condition)
+- **Ranked ending:** Reach Dec 29 with P < 1000 (your paper's contribution was limited — tiered based on final stats)
 
 **Important:** The win check happens ONLY after the final event (Dec 29). The game always plays through all 33 events unless the player is eliminated by suspicion. This preserves the full historical timeline as an educational experience. The Velvet Revolution always succeeds historically — the question is whether YOUR PAPER contributed meaningfully to it.
 
@@ -235,20 +235,20 @@ All changes to the user's original stat values must be documented in a `BALANCE_
    - Left: event card with dateline, headline, kicker, body text, attendance badge (Big Events)
    - Right: choices column with 2-3 editorial draft options showing stat impact pills
 3. **Outcome screen** — Shows chosen action's result text, animated stat deltas in handwritten style, "Next dispatch" button. Includes calculation transparency: base stat change, multiplier applied, and final value (e.g., "+150P × 1.15 Fame × 1.30 Cred = +224P"). Check for instant loss (S>=1000) before advancing.
-4. **Win screen** — P >= 1000 reached: celebratory ending themed as the paper becoming "Paper of Record"
-5. **Loss screen** — S >= 1000: "The StB found your press" ending
-6. **End screen** — Reached Dec 29 with P < 1000: ranked ending based on final stats (multiple tiers from "Paper of Record" to "A Footnote")
+4. **Legacy screen** — P >= 1000 at Dec 29: your paper became "Paper of Record"
+5. **Shutdown screen** — S >= 1000 mid-game: "The StB found your press"
+6. **Ranked screen** — Reached Dec 29 with P < 1000: tiered ending based on your contribution level
 
 ### Flow Logic
 
 ```
 Start → Event → Player picks choice → Apply deltas (with multipliers) → 
   Add passive suspicion → Check S >= 1000 → 
-    If yes → Loss screen
+    If yes → Shutdown screen
     If no → Outcome screen → Check if last event →
       If yes → Check P >= 1000 →
-        If yes → Win screen
-        If no → End screen (ranked)
+        If yes → Legacy screen
+        If no → Ranked screen
       If no → Next event
 ```
 
@@ -319,17 +319,17 @@ Ported directly from the prototype's CSS. No redesign needed — the samizdat ae
 
 ## Endings
 
-### Win (P >= 1000 at Dec 29)
+### Legacy Ending (P >= 1000 at Dec 29)
 
 Title: "Svobodný Tisk — Paper of Record"
 The paper is preserved in the National Library. Cited in foreign monographs. Your reporting helped shape the revolution. The Velvet Revolution succeeded — and your pages were part of why.
 
-### Loss (S >= 1000 mid-game)
+### Shutdown Ending (S >= 1000 mid-game)
 
 Title: "The paper went silent."
 The StB found your press. Editors arrested. The revolution carried on and succeeded without you — Havel still took the oath on December 29. But your pages were not in the hands that mattered.
 
-### Soft Loss — Ranked Tiers (Dec 29, P < 1000)
+### Ranked Endings (Dec 29, P < 1000)
 
 The Velvet Revolution succeeded regardless — the question is whether your paper contributed. All endings acknowledge the historical outcome.
 
