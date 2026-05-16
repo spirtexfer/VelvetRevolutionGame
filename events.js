@@ -815,7 +815,7 @@ window.VR_EVENTS = [
   {
     id: "n20_1600",
     date: "PRAGUE — NOVEMBER 20, 1989 — 16:00",
-    headline: "200,000 Fill Wenceslas Square",
+    headline: "100,000 Fill Wenceslas Square",
     kicker: "The largest gathering since 1968. The square is one body.",
     body: "From the National Museum to Můstek, the square is shoulder-to-shoulder. Keys jangle across the whole width of the boulevard. 'Havel na Hrad' is heard as a mass chant for the first time, a sound that fills the space between the facades. Factory workers from Vysočany stand beside students from Malá Strana. The Letná plateau is whispered as the next stage.",
     attendance: 100000,
@@ -823,7 +823,7 @@ window.VR_EVENTS = [
       {
         id: "publish_aerial_count",
         label: "PUBLISH THE AERIAL COUNT",
-        draft: "We borrow the architect's roof on Vodičkova, count by grid, and print the number — 200,000 — in 96-point above the fold.",
+        draft: "We borrow the architect's roof on Vodičkova, count by grid, and print the number — 100,000 — in 96-point above the fold.",
         deltas: {
           pressure: 76,
           suspicion: 70,

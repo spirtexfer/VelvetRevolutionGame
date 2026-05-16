@@ -331,13 +331,17 @@ function renderStatTicker(container) {
     statDiv.appendChild(el("div", "stat-label", meta.label));
     statDiv.appendChild(el("div", "stat-sub", meta.sub));
 
-    var maxVal = (k === "pressure" || k === "suspicion") ? 1000 : 1000;
+    var maxVal = 1000;
     var pct = Math.min(100, (v / maxVal) * 100);
 
+    var multText = getMultiplierDisplay(k, v);
     var valueRow = el("div", "stat-value-row", [
-      el("div", "stat-value", String(Math.round(v))),
-      el("div", "stat-multiplier", "[ " + getMultiplierDisplay(k, v) + " ]")
+      el("div", "stat-value", String(Math.round(v)))
     ]);
+    if (multText) {
+      valueRow.appendChild(el("div", "stat-multiplier", "[ " + multText + " ]"));
+    }
+
     statDiv.appendChild(valueRow);
 
     var bar = el("div", "stat-bar");
