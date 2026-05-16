@@ -1,75 +1,74 @@
 # Balance Log
 
-## Methodology
+## Problem
 
-Ran automated simulations for 4 strategy archetypes plus 2 hybrid strategies.
-Adjusted stat values using uniform scaling factors to meet the design spec's balancing goals.
+Player reported winning by spamming random options. Monte Carlo analysis confirmed: with the original uniform ×0.42 P scaling, 50/50 C1/C2 play won 76% of the time. Root cause: C2 choices gave too much pressure, and the Fame×Credibility multiplier snowballed unchecked.
 
-### Strategy Definitions
+## Final Balance Parameters
 
-- **Aggressive:** Always pick Choice 1 (highest base Pressure)
-- **Balanced:** Pick Choice 1 when Suspicion < 400 and Choice 1's S <= 25; otherwise pick Choice 2
-- **Cautious:** Always pick the lowest-Suspicion choice
-- **Pro-government:** Always pick the last choice (lowest/negative Pressure)
-- **C2-only:** Always pick Choice 2 (moderate option)
-
-### Balancing Goals (from spec)
-
-1. Aggressive: Can win (P>=1000) but risks S>=1000 shutdown
-2. Cautious: Survives to Dec 29 but cannot reach P>=1000
-3. Balanced: Narrow viable path to Legacy ending (P>=1000)
-4. Pro-government: Very low P, very low S
-
-## Scaling Applied
-
-The original stat values from the design doc were calibrated without accounting for the compounding effect of Fame and Credibility multipliers on Pressure, and the Suspicion multiplier on Suspicion gains. The multiplier system caused severe snowballing:
-
-- **Pre-balance aggressive:** P=1953, S=1049 (SHUTDOWN at event 19/35)
-- **Pre-balance balanced:** P=2392, S=1024 (SHUTDOWN at event 27/35 — should survive)
-
-### Scaling Factors
+### Event Scaling (applied to original design-doc values)
 
 | Stat | Choice | Factor | Reason |
 |------|--------|--------|--------|
-| Pressure (positive) | All | ×0.42 | Combined Fame×Credibility multiplier reaches ×2.32 at high stats; base P must be reduced to prevent snowball |
-| Suspicion (positive) | Choice 1 | ×0.70 | Aggressive choices remain dangerous but don't instantly kill |
-| Suspicion (positive) | Choice 2/3 | ×0.45 | Moderate/cautious choices must allow survival for balanced players |
+| Pressure (positive) | C1, big event (has attendance) | ×0.65 | Big events are the primary P source; ratio ~2:1 P/S makes them the strategic pick |
+| Pressure (positive) | C1, small event | ×0.30 | Small events give modest P; not worth the S cost in late game |
+| Pressure (positive) | C2/C3 | ×0.06 | Near-zero P so spamming C2 doesn't snowball into a win |
+| Suspicion (positive) | C1 | ×0.55 | C1 carries real risk; combined with steep multiplier, punishes late-game C1 picks |
+| Suspicion (positive) | C2/C3 | ×0.10 | C2 is the "safe" option — minimal S cost |
 | Pressure (negative) | All | unchanged | Penalties should remain punishing |
-| Suspicion (negative) | All | unchanged | Suspicion reduction is valuable and shouldn't be inflated |
-| Fame | All | unchanged | Fame growth drives multiplier curve naturally |
-| Credibility | All | unchanged | Credibility growth drives multiplier curve naturally |
+| Suspicion (negative) | All | unchanged | S reduction is valuable and shouldn't be inflated |
+| Fame | All | unchanged | |
+| Credibility | All | unchanged | |
 
-## Simulation Results (Post-Balance)
+"Big event" = any event with an `attendance` field (11 of 35 events).
 
-### Aggressive
-- Final P: 1220 (at shutdown)
-- Final S: 1031 → **SHUTDOWN at event 25**
-- Outcome: High pressure built up but StB catches the paper. Matches goal.
+### Game Engine Parameters
 
-### Balanced (smart switching)
-- Final P: 1000
-- Final S: 348
-- Outcome: **LEGACY** — barely reaches the threshold with razor-thin margin. One suboptimal choice and the player misses it. Matches "narrow viable path" goal.
+| Parameter | Value | Reason |
+|-----------|-------|--------|
+| Pressure multiplier cap | ×1.40 | Prevents Fame×Cred snowball while still rewarding stat growth |
+| Suspicion multiplier curve | 1.00 / 1.10 / 1.25 / 1.50 / 1.80 | Steep: punishes C1 picks at high S; differentiates smart vs random play |
+| S multiplier thresholds | 0 / 200 / 400 / 600 / 800 | |
+| Passive suspicion | +0 / +10 / +20 / +35 | Higher than design doc; creates time pressure in late game |
+| Passive S thresholds (F+C) | 0 / 400 / 700 / 1000 | |
 
-### C2-Only (always moderate)
-- Final P: 675
-- Final S: 224
-- Outcome: **FOOTNOTE** — a player who never takes risks gets a middle-tier ending. Incentivizes strategic risk-taking.
+## Monte Carlo Results (10,000 runs each)
 
-### Cautious (minimize suspicion)
-- Final P: 48
-- Final S: 0
-- Outcome: **FOLDS** — safe but useless. The paper contributed nothing.
+### Deterministic Strategies
 
-### Pro-Government
-- Final P: 0
-- Final S: 0
-- Outcome: **FOLDS** — complete silence. History doesn't record what you chose not to print.
+| Strategy | Ending | Final P | Final S | Notes |
+|----------|--------|---------|---------|-------|
+| Big-events-only (optimal) | LEGACY | 1562 | 940 | Comfortable win with margin for ~2 mistakes |
+| Aggressive (always C1) | SHUTDOWN | 993 | 1017 | Shutdown at event 26/35 |
+| Cautious (lowest S) | FOLDS | 58 | 0 | Safe but useless |
+| C2-only | FOLDS | 55 | 181 | Trivial P from C2 choices |
+| Pro-government (always C3) | FOLDS | 0 | 0 | Complete silence |
+
+### Stochastic Strategies
+
+| Strategy | Win Rate | Shutdown Rate | Notes |
+|----------|----------|---------------|-------|
+| Random (uniform 3-way) | 0.6% | 0.1% | C3 picks tank pressure |
+| 50/50 (C1 or C2) | 23% | 32% | Borderline; most runs get FOOTNOTE |
+| 70/30 C1-biased | 7% | 89% | Overwhelming shutdown rate |
 
 ## Key Balance Properties
 
-1. **Multiplier snowball is controlled:** Even at high F/C, the reduced base P keeps total pressure manageable
-2. **Passive suspicion matters but doesn't kill:** Balanced play reaches F+C ~995 by endgame, adding +10 passive S per turn — significant but survivable
-3. **Aggressive vs balanced gap:** Aggressive play accumulates ~3× more suspicion than balanced, creating a clear risk/reward tradeoff
-4. **Late-game tension preserved:** The biggest P gains come from late Big Events (Letná +105, General Strike +126) where multipliers are highest — the final push is where it gets exciting
-5. **No unwinnable death spirals:** Balanced play's S=348 at endgame means there's real headroom for a few mistakes
+1. **Winning strategy is learnable**: pick C1 on big crowd events, C2 on everything else. Player can identify big events from narrative context (protests, rallies).
+2. **Random spam doesn't work**: uniform random wins 0.6%, down from 76% pre-balance.
+3. **50/50 spam is borderline**: 23% win rate means most random C1/C2 play ends in FOOTNOTE or SHUTDOWN.
+4. **Late-game tension**: biggest P gains come from Letná (163) and General Strike (195), where S is already high. Last two events (Dec 10, Dec 29) have near-zero S cost as reward events.
+5. **Passive S creates time pressure**: +35 S per turn at high Fame+Credibility means even C2 picks aren't free in late game.
+6. **Margin for error**: optimal play reaches P=1562, so player can miss ~2 big events and still win.
+
+## Methodology
+
+Tested 30+ configurations across these dimensions:
+- Big/small C1 P scaling (0.25–0.80)
+- C2/C3 P scaling (0.03–0.10)
+- C1/C2 S scaling (0.40–0.60 / 0.00–0.45)
+- Pressure multiplier cap (1.30–1.50)
+- S multiplier curves (mild/moderate/steep/very-steep)
+- Passive S amounts (original through 4× original)
+
+Each config validated with 10,000-run Monte Carlo simulations for random, 50/50, and 70/30 strategies, plus deterministic traces for optimal, aggressive, cautious, and pro-government play.

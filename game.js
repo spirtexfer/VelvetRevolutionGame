@@ -32,18 +32,18 @@ function getCredibilityMultiplier(cred) {
 }
 
 function getSuspicionMultiplier(susp) {
-  if (susp >= 800) return 1.30;
-  if (susp >= 600) return 1.20;
-  if (susp >= 400) return 1.10;
-  if (susp >= 200) return 1.05;
+  if (susp >= 800) return 1.80;
+  if (susp >= 600) return 1.50;
+  if (susp >= 400) return 1.25;
+  if (susp >= 200) return 1.10;
   return 1.00;
 }
 
 function getPassiveSuspicion(fame, cred) {
   var combined = fame + cred;
-  if (combined >= 1000) return 20;
-  if (combined >= 700)  return 10;
-  if (combined >= 400)  return 5;
+  if (combined >= 1000) return 35;
+  if (combined >= 700)  return 20;
+  if (combined >= 400)  return 10;
   return 0;
 }
 
@@ -64,12 +64,13 @@ function applyDeltas(stats, baseDelta) {
   var actualDeltas = {};
   var breakdown = {};
 
-  // Pressure: multiply positive gains by Fame × Credibility
+  // Pressure: multiply positive gains by Fame × Credibility (capped at 1.40)
   var baseP = baseDelta.pressure || 0;
   if (baseP > 0) {
     var fameMult = getFameMultiplier(stats.fame);
     var credMult = getCredibilityMultiplier(stats.credibility);
-    actualDeltas.pressure = Math.round(baseP * fameMult * credMult);
+    var combinedMult = Math.min(fameMult * credMult, 1.40);
+    actualDeltas.pressure = Math.round(baseP * combinedMult);
     breakdown.pressure = {
       base: baseP,
       fameMult: fameMult,
@@ -135,18 +136,18 @@ function runStatTests() {
   console.assert(getCredibilityMultiplier(300) === 1.30, "Cred 300 → 1.30");
   console.assert(getCredibilityMultiplier(500) === 1.45, "Cred 500 → 1.45");
 
-  // Test 3: Suspicion multiplier brackets
+  // Test 3: Suspicion multiplier brackets (steep curve)
   console.assert(getSuspicionMultiplier(100) === 1.00, "Susp 100 → 1.00");
-  console.assert(getSuspicionMultiplier(300) === 1.05, "Susp 300 → 1.05");
-  console.assert(getSuspicionMultiplier(500) === 1.10, "Susp 500 → 1.10");
-  console.assert(getSuspicionMultiplier(700) === 1.20, "Susp 700 → 1.20");
-  console.assert(getSuspicionMultiplier(900) === 1.30, "Susp 900 → 1.30");
+  console.assert(getSuspicionMultiplier(300) === 1.10, "Susp 300 → 1.10");
+  console.assert(getSuspicionMultiplier(500) === 1.25, "Susp 500 → 1.25");
+  console.assert(getSuspicionMultiplier(700) === 1.50, "Susp 700 → 1.50");
+  console.assert(getSuspicionMultiplier(900) === 1.80, "Susp 900 → 1.80");
 
   // Test 4: Passive suspicion
   console.assert(getPassiveSuspicion(100, 100) === 0,  "F100+C100 → 0 passive");
-  console.assert(getPassiveSuspicion(200, 200) === 5,  "F200+C200 → 5 passive");
-  console.assert(getPassiveSuspicion(400, 300) === 10, "F400+C300 → 10 passive");
-  console.assert(getPassiveSuspicion(600, 500) === 20, "F600+C500 → 20 passive");
+  console.assert(getPassiveSuspicion(200, 200) === 10, "F200+C200 → 10 passive");
+  console.assert(getPassiveSuspicion(400, 300) === 20, "F400+C300 → 20 passive");
+  console.assert(getPassiveSuspicion(600, 500) === 35, "F600+C500 → 35 passive");
 
   // Test 5: applyDeltas with initial stats
   var result = applyDeltas(INITIAL_STATS, { pressure: 80, suspicion: 45, fame: 30, credibility: 10 });
@@ -369,14 +370,20 @@ function renderStatTicker(container) {
 function renderCalendarStrip(container) {
   var events = window.VR_EVENTS;
   var strip = el("div", "calendar-strip");
+  var lastDate = "";
 
   for (var i = 0; i < events.length; i++) {
     var shortLabel = extractShortDate(events[i].date);
+    var isNewDay = shortLabel !== lastDate;
+    lastDate = shortLabel;
+
     var cls = "cal-tick";
+    if (!isNewDay) cls += " cal-tick-minor";
+    if (isNewDay && i > 0) cls += " cal-day-start";
     if (i < gameState.eventIndex) cls += " past";
     if (i === gameState.eventIndex) cls += " current";
 
-    var tick = el("div", cls, shortLabel);
+    var tick = el("div", cls, isNewDay ? shortLabel : "");
     tick.title = events[i].date;
     strip.appendChild(tick);
   }
