@@ -219,7 +219,8 @@ function resetState() {
     breakdown: {},
     passiveSuspicion: 0,
     chosenAction: null,
-    history: []
+    history: [],
+    endingType: null
   };
   localStorage.removeItem(STORAGE_KEY);
 }
@@ -317,6 +318,8 @@ function renderMasthead(container, issueNumber, dateline) {
 
 function renderStatTicker(container) {
   var ticker = el("div", "stat-ticker");
+  ticker.setAttribute("aria-live", "polite");
+  ticker.setAttribute("aria-label", "Game statistics");
   var keys = ["pressure", "suspicion", "fame", "credibility"];
 
   for (var i = 0; i < keys.length; i++) {
@@ -487,7 +490,9 @@ function renderEvent(container) {
 
   for (var i = 0; i < event.choices.length; i++) {
     (function(choice, idx) {
-      var btn = el("button", "choice fade-up");
+      var wouldExceed = applyDeltas(gameState.stats, choice.deltas).stats.suspicion >= 1000;
+      var btn = el("button", "choice fade-up" + (wouldExceed ? " danger-suspicion" : ""));
+      btn.setAttribute("aria-label", choice.label + " — " + choice.draft);
       btn.style.animationDelay = (idx * 80) + "ms";
 
       btn.appendChild(el("span", "choice-mark",
@@ -531,10 +536,11 @@ function pickChoice(choice) {
   // Check for shutdown (S >= 1000)
   if (gameState.stats.suspicion >= 1000) {
     gameState.phase = "shutdown";
-  } else {
-    gameState.phase = "outcome";
+    transitionToEnding("loss");
+    return;
   }
 
+  gameState.phase = "outcome";
   render();
 }
 
@@ -619,11 +625,13 @@ function renderOutcome(container) {
 function advanceToNext() {
   var events = window.VR_EVENTS;
   if (gameState.eventIndex + 1 >= events.length) {
-    // Final event — check for legacy ending
     if (gameState.stats.pressure >= 1000) {
       gameState.phase = "legacy";
+      transitionToEnding("win");
     } else {
       gameState.phase = "ranked";
+      var isGoodRank = gameState.stats.pressure >= 800 && gameState.stats.credibility >= 50;
+      transitionToEnding(isGoodRank ? "win" : "loss");
     }
   } else {
     gameState.eventIndex++;
@@ -632,8 +640,23 @@ function advanceToNext() {
     gameState.breakdown = {};
     gameState.passiveSuspicion = 0;
     gameState.phase = "event";
+    render();
   }
-  render();
+}
+
+function transitionToEnding(type) {
+  var overlay = document.createElement("div");
+  overlay.className = "ending-overlay " + (type === "win" ? "ending-win" : "ending-loss");
+  document.body.appendChild(overlay);
+  requestAnimationFrame(function() { overlay.classList.add("active"); });
+  setTimeout(function() {
+    gameState.endingType = type;
+    render();
+    setTimeout(function() {
+      overlay.classList.add("fade-out");
+      setTimeout(function() { overlay.remove(); }, 800);
+    }, 300);
+  }, 1500);
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -729,16 +752,19 @@ function renderRanked(container) {
 }
 
 function appendFinalStats(card) {
-  var statsDiv = el("div", "outcome-deltas");
-  statsDiv.style.borderTop = "none";
-  statsDiv.style.paddingTop = "0";
-  var keys = ["pressure", "suspicion", "fame", "credibility"];
-  for (var i = 0; i < keys.length; i++) {
-    var k = keys[i];
-    statsDiv.appendChild(el("span", "outcome-delta",
-      STAT_META[k].label + " · " + Math.round(gameState.stats[k])));
+  var scoreDiv = el("div", "final-score");
+  scoreDiv.appendChild(el("div", "final-score-label", "Final Pressure"));
+  scoreDiv.appendChild(el("div", "final-score-value", String(Math.round(gameState.stats.pressure))));
+
+  var secondaryStats = el("div", "final-stats-secondary");
+  var others = ["suspicion", "fame", "credibility"];
+  for (var i = 0; i < others.length; i++) {
+    var k = others[i];
+    secondaryStats.appendChild(el("span", "final-stat-item",
+      STAT_META[k].label + " " + Math.round(gameState.stats[k])));
   }
-  card.appendChild(statsDiv);
+  scoreDiv.appendChild(secondaryStats);
+  card.appendChild(scoreDiv);
 }
 
 function appendRestartButton(card) {
@@ -766,44 +792,49 @@ function getCurrentDateText() {
    RENDER DISPATCHER
    ═══════════════════════════════════════════════════════════════ */
 
+var _footer = null;
+
 function render() {
   var paper = document.getElementById("paper");
-  paper.innerHTML = "";
-  paper.className = "paper" + (gameState.stats.suspicion >= 900 ? " danger" : "");
+  var endCls = gameState.endingType ? " ending-" + gameState.endingType : "";
+  paper.className = "paper" + (gameState.stats.suspicion >= 900 ? " danger" : "") + endCls;
 
   var events = window.VR_EVENTS;
   var event = events[gameState.eventIndex];
   var dateline = event ? event.date : "PRAGUE — DECEMBER 29, 1989";
   var issueNumber = gameState.eventIndex + 1;
 
-  renderMasthead(paper, issueNumber, dateline);
-  renderStatTicker(paper);
+  var fragment = document.createDocumentFragment();
+
+  renderMasthead(fragment, issueNumber, dateline);
+  renderStatTicker(fragment);
 
   if (gameState.phase !== "start" && gameState.phase !== "legacy" &&
       gameState.phase !== "shutdown" && gameState.phase !== "ranked") {
-    renderCalendarStrip(paper);
+    renderCalendarStrip(fragment);
   }
 
   switch (gameState.phase) {
-    case "start":    renderStart(paper); break;
-    case "event":    renderEvent(paper); break;
-    case "outcome":  renderOutcome(paper); break;
-    case "legacy":   renderLegacy(paper); break;
-    case "shutdown": renderShutdown(paper); break;
-    case "ranked":   renderRanked(paper); break;
+    case "start":    renderStart(fragment); break;
+    case "event":    renderEvent(fragment); break;
+    case "outcome":  renderOutcome(fragment); break;
+    case "legacy":   renderLegacy(fragment); break;
+    case "shutdown": renderShutdown(fragment); break;
+    case "ranked":   renderRanked(fragment); break;
   }
 
-  renderFooter(paper);
-  saveState();
-}
+  if (!_footer) {
+    _footer = elHTML("footer", "deck",
+      '<div class="deck-item"><div class="deck-label">Editor in Chief</div>J. Procházková</div>' +
+      '<div class="deck-item"><div class="deck-label">Printer of record</div>mimeograph № 4 · Žižkov</div>' +
+      '<div class="deck-item"><div class="deck-label">Issued under</div>no permit · no imprint · no quarter</div>'
+    );
+  }
+  fragment.appendChild(_footer);
 
-function renderFooter(container) {
-  var deck = elHTML("footer", "deck",
-    '<div class="deck-item"><div class="deck-label">Editor in Chief</div>J. Procházková</div>' +
-    '<div class="deck-item"><div class="deck-label">Printer of record</div>mimeograph № 4 · Žižkov</div>' +
-    '<div class="deck-item"><div class="deck-label">Issued under</div>no permit · no imprint · no quarter</div>'
-  );
-  container.appendChild(deck);
+  paper.innerHTML = "";
+  paper.appendChild(fragment);
+  saveState();
 }
 
 /* ═══════════════════════════════════════════════════════════════
