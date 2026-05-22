@@ -768,15 +768,134 @@ function appendFinalStats(card) {
 }
 
 function appendRestartButton(card) {
-  var btnDiv = el("div", null);
-  btnDiv.style.marginTop = "24px";
+  var btnDiv = el("div", "end-buttons");
   var btn = el("button", "btn-begin", "Set the type again");
   btn.addEventListener("click", function() {
     resetState();
     render();
   });
   btnDiv.appendChild(btn);
+
+  var exploreBtn = el("button", "btn-explore", "Explore More on Effects");
+  exploreBtn.addEventListener("click", function() {
+    showExploreModal();
+  });
+  btnDiv.appendChild(exploreBtn);
   card.appendChild(btnDiv);
+}
+
+function showExploreModal() {
+  var overlay = el("div", "explore-overlay");
+  var modal = el("div", "explore-modal");
+
+  var closeBtn = el("button", "explore-close", "×");
+  closeBtn.addEventListener("click", function() {
+    overlay.classList.remove("explore-visible");
+    setTimeout(function() { overlay.remove(); }, 300);
+  });
+  modal.appendChild(closeBtn);
+
+  modal.appendChild(el("h2", "explore-heading", "Beyond the Revolution: Lasting Effects"));
+
+  modal.appendChild(el("h3", "explore-subheading", "Transforming Czechoslovakia’s Political & Economic System"));
+  modal.appendChild(elHTML("p", "explore-text",
+    "The Velvet Revolution dismantled four decades of communist one-party rule in a matter of weeks. " +
+    "By December 29, 1989, Václav Havel—a dissident playwright who had been imprisoned just months earlier—was " +
+    "sworn in as president. The Federal Assembly repealed the constitutional clause guaranteeing the Communist " +
+    "Party’s “leading role,” and free multi-party elections were held in June 1990." +
+    "<br><br>" +
+    "Economically, the country pivoted from a centrally planned system to a market economy. Finance Minister " +
+    "Václav Klaus championed rapid “shock therapy”: price liberalization, mass privatization through a voucher " +
+    "program, and the opening of trade to Western markets. State-owned enterprises were transferred to private " +
+    "hands, and Czechoslovakia sought integration into European economic institutions."
+  ));
+
+  modal.appendChild(el("h3", "explore-subheading", "The Velvet Divorce: One Revolution, Two Visions"));
+  modal.appendChild(elHTML("p", "explore-text",
+    "While Czechs and Slovaks had united against communism, they soon discovered deep disagreements about " +
+    "the path forward. Czech leaders, led by Klaus, favored rapid free-market reforms and swift privatization. " +
+    "Slovak leaders, particularly Vladimír Mečiar, advocated for a slower, more gradual transition that would " +
+    "protect Slovak industry and workers from the pain of abrupt restructuring." +
+    "<br><br>" +
+    "These tensions were not only economic. Slovaks sought greater autonomy and recognition of their distinct " +
+    "national identity within the federation. Negotiations over power-sharing repeatedly stalled. On January 1, " +
+    "1993—just three years after the revolution—Czechoslovakia peacefully dissolved into the Czech Republic and " +
+    "Slovakia in what became known as the <strong>Velvet Divorce</strong>. It was one of the few instances in modern " +
+    "history where a nation split without violence, though public opinion polls at the time showed that majorities " +
+    "in <em>both</em> countries had actually opposed the separation."
+  ));
+
+  modal.appendChild(el("h3", "explore-subheading", "Global Reverberations: Changing Minds Worldwide"));
+  modal.appendChild(elHTML("p", "explore-text",
+    "The Velvet Revolution was not an isolated event—it was the most dramatic chapter in the wave of 1989 " +
+    "revolutions that swept across Central and Eastern Europe. Its peaceful character became a powerful symbol: " +
+    "proof that authoritarian regimes could be toppled by civic mobilization rather than armed struggle." +
+    "<br><br>" +
+    "Globally, the events reshaped opinions about political and economic systems in several ways:" +
+    "<br><br>" +
+    "• <strong>Discrediting central planning.</strong> The rapid collapse of communist governments demonstrated that " +
+    "state-controlled economies had failed to deliver prosperity or freedom. This strengthened the global consensus " +
+    "around market-based economics and accelerated liberalization policies in developing nations throughout the 1990s." +
+    "<br><br>" +
+    "• <strong>Validating nonviolent resistance.</strong> The revolution inspired activists from South Africa to " +
+    "Myanmar to the Arab Spring. Havel’s concept of “living in truth”—the idea that refusing to participate in a " +
+    "system’s lies can undermine it—became a foundational text for pro-democracy movements worldwide." +
+    "<br><br>" +
+    "• <strong>Reshaping the global order.</strong> The fall of communist regimes in 1989 ended the Cold War binary " +
+    "of capitalism versus communism. It led to the expansion of NATO and the European Union eastward, redrawing the " +
+    "political and economic map of Europe. Some scholars argued it marked the “end of history”—the triumph of " +
+    "liberal democracy as the final form of government—while others warned that the transition would be far messier " +
+    "and more contested than it first appeared." +
+    "<br><br>" +
+    "• <strong>Complicating the triumph narrative.</strong> The subsequent decades revealed that democratic transitions " +
+    "are fragile. Rising inequality, corruption scandals tied to privatization, and the eventual resurgence of populist " +
+    "and illiberal politics in parts of Central Europe showed that overthrowing an old system is only the beginning—" +
+    "building a just new one is the harder, longer work."
+  ));
+
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+  requestAnimationFrame(function() {
+    requestAnimationFrame(function() {
+      overlay.classList.add("explore-visible");
+    });
+  });
+}
+
+function showRestartConfirm() {
+  var overlay = el("div", "restart-overlay");
+  var box = el("div", "restart-confirm");
+
+  box.appendChild(el("h3", "restart-confirm-title", "Abandon this run?"));
+  box.appendChild(el("p", "restart-confirm-text",
+    "Your current progress will be lost. The revolution waits for no one."));
+
+  var btns = el("div", "restart-confirm-btns");
+
+  var yesBtn = el("button", "btn-begin restart-yes", "Restart");
+  yesBtn.addEventListener("click", function() {
+    overlay.remove();
+    resetState();
+    render();
+  });
+
+  var noBtn = el("button", "btn-explore restart-no", "Continue");
+  noBtn.addEventListener("click", function() {
+    overlay.classList.remove("explore-visible");
+    setTimeout(function() { overlay.remove(); }, 200);
+  });
+
+  btns.appendChild(yesBtn);
+  btns.appendChild(noBtn);
+  box.appendChild(btns);
+
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+  requestAnimationFrame(function() {
+    requestAnimationFrame(function() {
+      overlay.classList.add("explore-visible");
+    });
+  });
 }
 
 function getCurrentDateText() {
@@ -834,6 +953,13 @@ function render() {
 
   paper.innerHTML = "";
   paper.appendChild(fragment);
+
+  if (gameState.phase === "event" || gameState.phase === "outcome") {
+    var restartBtn = el("button", "restart-corner", "↺ Restart");
+    restartBtn.addEventListener("click", showRestartConfirm);
+    paper.appendChild(restartBtn);
+  }
+
   saveState();
 }
 

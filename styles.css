@@ -892,3 +892,190 @@ html, body {
   color: var(--ink-faded);
   letter-spacing: 0.05em;
 }
+
+/* End screen buttons */
+.end-buttons {
+  margin-top: 24px;
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.btn-explore {
+  font-family: 'Special Elite', monospace;
+  font-size: 14px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  background: transparent;
+  color: var(--ink-2);
+  border: 2px solid var(--rule);
+  padding: 14px 22px;
+  cursor: pointer;
+  transition: transform 0.15s, border-color 0.2s, color 0.2s;
+}
+.btn-explore:hover {
+  transform: translateY(-2px);
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
+/* Explore modal */
+.explore-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: rgba(20, 12, 5, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  overflow-y: auto;
+  padding: 24px;
+}
+.explore-overlay.explore-visible { opacity: 1; }
+
+.explore-modal {
+  position: relative;
+  max-width: 720px;
+  width: 100%;
+  max-height: 85vh;
+  overflow-y: auto;
+  background: var(--paper-1);
+  border: 3px double var(--rule);
+  padding: 44px 48px 48px;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.4);
+  transform: translateY(20px);
+  transition: transform 0.3s ease;
+}
+.explore-visible .explore-modal { transform: translateY(0); }
+
+.explore-close {
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  background: none;
+  border: none;
+  font-size: 32px;
+  color: var(--ink-faded);
+  cursor: pointer;
+  line-height: 1;
+  padding: 4px 8px;
+  transition: color 0.15s;
+}
+.explore-close:hover { color: var(--stamp-red); }
+
+.explore-heading {
+  font-family: 'Playfair Display', serif;
+  font-weight: 900;
+  font-size: clamp(22px, 4vw, 30px);
+  color: var(--ink);
+  margin: 0 0 28px;
+  padding-bottom: 16px;
+  border-bottom: 2px solid var(--rule);
+  letter-spacing: -0.01em;
+}
+
+.explore-subheading {
+  font-family: 'Playfair Display', serif;
+  font-weight: 700;
+  font-size: clamp(16px, 3vw, 20px);
+  color: var(--ink);
+  margin: 28px 0 12px;
+}
+
+.explore-text {
+  font-family: 'Lora', serif;
+  font-size: 15px;
+  line-height: 1.7;
+  color: var(--ink-2);
+  margin: 0 0 8px;
+}
+.explore-text strong { color: var(--ink); }
+
+/* Restart corner button */
+.restart-corner {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  z-index: 100;
+  font-family: 'Special Elite', monospace;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: var(--paper-1);
+  color: var(--ink-faded);
+  border: 1px solid var(--rule);
+  padding: 8px 14px;
+  cursor: pointer;
+  opacity: 0.5;
+  transition: opacity 0.2s, border-color 0.2s, color 0.2s;
+}
+.restart-corner:hover {
+  opacity: 1;
+  color: var(--stamp-red);
+  border-color: var(--stamp-red);
+}
+
+/* Restart confirmation dialog */
+.restart-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: rgba(20, 12, 5, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  padding: 24px;
+}
+.restart-overlay.explore-visible { opacity: 1; }
+
+.restart-confirm {
+  background: var(--paper-1);
+  border: 3px double var(--rule);
+  padding: 32px 40px;
+  max-width: 400px;
+  width: 100%;
+  text-align: center;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.4);
+  transform: scale(0.95);
+  transition: transform 0.2s ease;
+}
+.restart-overlay.explore-visible .restart-confirm { transform: scale(1); }
+
+.restart-confirm-title {
+  font-family: 'Playfair Display', serif;
+  font-weight: 900;
+  font-size: 22px;
+  color: var(--ink);
+  margin: 0 0 10px;
+}
+.restart-confirm-text {
+  font-family: 'Lora', serif;
+  font-size: 15px;
+  color: var(--ink-2);
+  line-height: 1.5;
+  margin: 0 0 24px;
+}
+.restart-confirm-btns {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+.restart-confirm-btns .restart-yes {
+  font-size: 14px;
+  padding: 10px 20px;
+}
+.restart-confirm-btns .restart-no {
+  font-size: 14px;
+  padding: 10px 20px;
+}
+
+@media (max-width: 600px) {
+  .explore-modal { padding: 28px 20px 32px; }
+  .end-buttons { flex-direction: column; }
+  .restart-confirm { padding: 24px 20px; }
+}
